@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import math
-from functools import reduce
-
 import numpy as np
-from numpy.linalg import inv, det, slogdet
-from scipy.stats import norm, multivariate_normal
+from numpy.linalg import inv
+from scipy.stats import multivariate_normal
 
 
 class UnivariateGaussian:
@@ -20,21 +17,23 @@ class UnivariateGaussian:
         Parameters
         ----------
         biased_var : bool, default=False
-            Should fitted estimator of variance be a biased or unbiased estimator
+            Should fitted estimator of variance be a biased or unbiased
+            estimator
 
         Attributes
         ----------
         fitted_ : bool
-            Initialized as false indicating current estimator instance has not been fitted.
-            To be set as True in `UnivariateGaussian.fit` function.
+            Initialized as false indicating current estimator instance has not
+            been fitted. To be set as True in `UnivariateGaussian.fit`
+            function.
 
         mu_: float
-            Estimated expectation initialized as None. To be set in `UnivariateGaussian.fit`
-            function.
+            Estimated expectation initialized as None. To be set in
+            `UnivariateGaussian.fit` function.
 
         var_: float
-            Estimated variance initialized as None. To be set in `UnivariateGaussian.fit`
-            function.
+            Estimated variance initialized as None. To be set in
+            `UnivariateGaussian.fit` function.
         """
         self.biased_ = biased_var
         self.fitted_, self.mu_, self.var_ = False, None, None
@@ -54,18 +53,20 @@ class UnivariateGaussian:
 
         Notes
         -----
-        Sets `self.mu_`, `self.var_` attributes according to calculated estimation (where
-        estimator is either biased or unbiased). Then sets `self.fitted_` attribute to `True`
+        Sets `self.mu_`, `self.var_` attributes according to calculated
+        estimation (where estimator is either biased or unbiased). Then sets
+        `self.fitted_` attribute to `True`
         """
         self.mu_ = np.mean(X)
-        self.var_ = X.var(ddof=1)
+        self.var_ = X.var(ddof=0 if self.biased_ else 1)
 
         self.fitted_ = True
         return self
 
     def pdf(self, X: np.ndarray) -> np.ndarray:
         """
-        Calculate PDF of observations under Gaussian model with fitted estimators
+        Calculate PDF of observations under Gaussian model with fitted
+        estimators
 
         Parameters
         ----------
@@ -86,16 +87,23 @@ class UnivariateGaussian:
                 "Estimator must first be fitted before calling `pdf` function")
 
         pdfs = []
-        # todo: implement pdf explicitly (like in MultivariateGaussian)
-        for x in X:
-            pdfs.append(norm.pdf(x, self.mu_, self.var_))
 
-        return np.ndarray(pdfs)
+        denominator = (2 * np.pi * self.var_) ** 0.5
+
+        for x in X:
+            exp_arg = - ((x - self.mu_) ** 2) / (2 * self.var_)
+            numerator = np.exp(exp_arg)
+
+            x_pdf = numerator / denominator
+            pdfs.append(x_pdf)
+
+        return np.asarray(pdfs)
 
     @staticmethod
     def log_likelihood(mu: float, sigma: float, X: np.ndarray) -> float:
         """
-        Calculate the log-likelihood of the data under a specified Gaussian model
+        Calculate the log-likelihood of the data under a specified Gaussian
+        model
 
         Parameters
         ----------
@@ -111,12 +119,15 @@ class UnivariateGaussian:
         log_likelihood: float
             log-likelihood calculated
         """
-        n = norm(mu, sigma)
-        norm.logpdf()
-        likelihood = reduce(
-            lambda cur, new_sample: cur * n.pdf(new_sample), X, 1
-        )
-        return np.log(likelihood)
+        n_samples = X.shape[0]
+
+        left_operand = n_samples * np.log((1 / (2 * np.pi * sigma) ** 0.5))
+
+        right_operand = 0
+        for x in X:
+            right_operand += - ((x - mu) ** 2) / (2 * sigma)
+
+        return left_operand + right_operand
 
 
 class MultivariateGaussian:
