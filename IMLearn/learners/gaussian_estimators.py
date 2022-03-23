@@ -175,7 +175,7 @@ class MultivariateGaussian:
         Then sets `self.fitted_` attribute to `True`
         """
         self.mu_ = np.mean(X, axis=0)
-        self.cov_ = np.cov(X.T, ddof=1)
+        self.cov_ = np.cov(X, ddof=1, rowvar=False)
 
         self.fitted_ = True
         return self
@@ -200,14 +200,27 @@ class MultivariateGaussian:
         """
         if not self.fitted_:
             raise ValueError(
-                "Estimator must first be fitted before calling `pdf` function")
+                "Estimator must first be fitted before calling `pdf` function"
+            )
 
         pdfs = []
-        mn = multivariate_normal(self.mu_, self.cov_)
-        for x in X:
-            pdfs.append(mn.pdf(x))
 
-        return np.ndarray(pdfs)
+        n_features = X.shape[1]
+        cov_det = np.linalg.det(self.cov_)
+        cov_inv = np.linalg.inv(self.cov_)
+
+        denominator = (((2 * np.pi) ** n_features) * cov_det) ** 0.5
+
+        for x in X:
+            diff = x - self.mu_
+            diff_T = np.transpose(diff)
+            exp_arg = -0.5 * diff_T @ cov_inv @ diff
+            numerator = np.exp(exp_arg)
+
+            x_pdf = numerator / denominator
+            pdfs.append(x_pdf)
+
+        return np.asarray(pdfs)
 
     @staticmethod
     def log_likelihood(mu: np.ndarray, cov: np.ndarray,
@@ -229,18 +242,16 @@ class MultivariateGaussian:
         log_likelihood: float
             log-likelihood calculated over all input data and under given parameters of Gaussian
         """
+        n_samples = X.shape[0]
+        n_features = X.shape[1]
+
         cov_inv = np.linalg.inv(cov)
         cov_det = np.linalg.det(cov)
 
-        s1 = 0
-        for sample in X:
-            diff = (sample - mu)
-            s1 += -0.5 * diff.T.dot(cov_inv).dot(diff)
+        log_operand = 1 / (2 * np.pi * (cov_det ** 1 / n_features))
+        first_operand = 0.5 * n_samples * n_features * np.log(log_operand)
 
-        m = X.shape[0]
-        d = X.shape[1]
+        diff = (X - mu)
+        second_operand = -0.5 * np.sum(diff @ cov_inv * diff)
 
-        log_param = 1 / (2 * np.pi * (cov_det ** (1 / d)))
-        s2 = d * m * np.log(log_param) / 2
-
-        return s1 + s2
+        return first_operand + second_operand
