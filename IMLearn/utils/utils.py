@@ -35,6 +35,7 @@ def split_train_test(
         Responses of test samples
 
     """
+    y_name = y.name
     Xy = pd.concat([X, y], axis=1)
 
     n_samples = Xy.shape[0]
@@ -43,11 +44,11 @@ def split_train_test(
     train_xy = Xy.sample(n_samples_train)
     test_xy = Xy.drop(train_xy.index)
 
-    train_x = pd.DataFrame(train_xy.drop(["price"], axis=1))
-    test_x = pd.DataFrame(test_xy.drop(["price"], axis=1))
+    train_x = pd.DataFrame(train_xy.drop([y_name], axis=1))
+    test_x = pd.DataFrame(test_xy.drop([y_name], axis=1))
 
-    train_y = train_xy["price"]
-    test_y = test_xy["price"]
+    train_y = train_xy[y_name]
+    test_y = test_xy[y_name]
 
     return train_x, train_y, test_x, test_y
 
