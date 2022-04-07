@@ -1,10 +1,11 @@
 import pandas
+from scipy.stats import zscore
 
 from IMLearn.learners import MultivariateGaussian
 from IMLearn.utils import split_train_test
 from IMLearn.learners.regressors import LinearRegression
 
-from typing import NoReturn
+from typing import NoReturn, Tuple
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -13,8 +14,37 @@ import plotly.io as pio
 
 pio.templates.default = "simple_white"
 
+FEATURE_RESPONSE_PEARSON_COR_PLOT_TITLE_FORMAT = "feature:{}, correlation:{}"
 
-def load_data(filename: str):
+FILL_TONEXTY = "tonexty"
+CLR_LIGHT_GREY = "lightgrey"
+MODE_MARKERS_AND_LINES = "markers+lines"
+MODE_LINES = "lines"
+PLOT_HEIGHT = 400
+TITLE_ATTR = "title"
+
+RESPONSE = 1
+FEATURES = 0
+
+COL_BEDROOMS = "bedrooms"
+COL_PRICE = "price"
+COL_YR_BUILT = "yr_built"
+COL_YR_RENOVATED = "yr_renovated"
+COL_DATE = "date"
+COL_ID = "id"
+
+HOUSE_PRICES_CSV_PATH = "../datasets/house_prices.csv"
+
+Q4_LOWER_ERROR_TITLE = "mean - 2*std"
+Q4_UPPER_ERROR_TITLE = "mean + 2*std"
+Q4_LINE_TITLE = "Average Loss"
+Q4_PLOT_YAXIS_TITLE = "average loss"
+Q4_PLOT_XAXIS_TITLE = "percentage of sampled train data"
+Q4_PLOT_TITLE = ("Average Loss as a Function of percentage of sampled train "
+                 "data")
+
+
+def load_data(filename: str) -> pd.DataFrame:
     """
     Load house prices dataset and preprocess data.
     Parameters
@@ -27,64 +57,52 @@ def load_data(filename: str):
     Design matrix and response vector (prices) - either as a single
     DataFrame or a Tuple[DataFrame, Series]
     """
-    df = pd.read_csv(filename)
+    loaded_data = pd.read_csv(filename)
 
-    X = clean_data(df)
+    loaded_data = clean_data(loaded_data)
 
-    X = process_features(X)
-
-    y = X["price"]
-    X = X.drop(["price", "yr_renovated", "yr_built"], axis=1)
-
-    return X, y
+    return loaded_data
 
 
-def process_features(X):
-    # todo: zipcode,lat-long - drop or make valuable
-    #  find correlated features that can be dropped
-    #  generate new valuable features out of the existing ones
+def clean_data(X: pd.DataFrame) -> pd.DataFrame:
+    """
+    Cleans the given data from errors and extreme anomalies
+    """
 
-    X["yr_max"] = X[["yr_built", "yr_renovated"]].max(axis=1)
-    X["yr_sum"] = X["yr_built"] + 5 * X["yr_renovated"]
-    center = np.mean(X["lat"]), np.mean(X["long"])
-
-    X["dist_from_center"] = ((X["lat"] - center[0]) ** 2 +
-                             (X["long"] - center[1]) ** 2) ** 0.5
-    X["zipcode"] = X["zipcode"] // 100
-    one_hot = pd.get_dummies(X["zipcode"])
-    X = X.join(one_hot)
-    return X
-
-
-def clean_data(df):
-    X = df.drop(["id", "date"], axis=1)
-
-    # todo: consider using date again
-    # X = X.drop(X['T' not in str(X.date)].index)
-    # X["date"] = pd.Series(int(x[0][:4]) for x in X["date"].str.split('T'))
+    X = X.drop([COL_ID, COL_DATE, "zipcode"], axis=1)
 
     X = X.apply(pandas.to_numeric, errors='coerce')
     X = X.dropna()
     X = X.reset_index(drop=True)
+
+    # validations
     X = X.drop(X[X.price <= 0].index)
+
     X = X.drop(X[X.bedrooms <= 0].index)
+    X.loc[X[COL_BEDROOMS] == 33, COL_BEDROOMS] = 3
+
     X = X.drop(X[X.bathrooms <= 0].index)
+
     X = X.drop(X[X.floors <= 0].index)
+
     X = X.drop(X[X.sqft_living <= 0].index)
     X = X.drop(X[X.sqft_lot <= 0].index)
     X = X.drop(X[X.sqft_above <= 0].index)
-    X = X.drop(X[X.sqft_basement < 0].index)
+    X = X.drop(X[X.sqft_basement < 0].index)  # can be 0 if not exist
     X = X.drop(X[X.sqft_living15 <= 0].index)
     X = X.drop(X[X.sqft_lot15 <= 0].index)
-    X = X.drop(X[(X.waterfront < 0) | (X.waterfront > 1)].index)
-    X = X.drop(X[(X.view < 0) | (X.view > 4)].index)
-    X = X.drop(X[(X.condition < 1) | (X.condition > 5)].index)
-    X = X.drop(X[(X.grade < 1) | (X.grade > 13)].index)
-    X = X.drop(X[(X.yr_built <= 0) | (X.yr_built > 2015)].index)
-    X = X.drop(X[(X.yr_renovated < 0) |
-                 ((X.yr_renovated != 0) & (
-                         X.yr_renovated < X.yr_built))].index)
-    X = X.drop(X[X.zipcode <= 0].index)
+
+    X = X.drop(X[~X.waterfront.isin([0, 1])].index)
+
+    X = X.drop(X[~X.view.isin(range(0, 5))].index)
+
+    X = X.drop(X[~X.condition.isin(range(1, 6))].index)
+
+    X = X.drop(X[~X.grade.isin(range(1, 14))].index)
+
+    X = X.drop(X[~X.yr_built.isin(range(0, 2016))].index)
+    X = X.drop(X[~X.yr_renovated.isin(range(0, 2016))].index)
+
     return X
 
 
@@ -106,79 +124,101 @@ def feature_evaluation(X: pd.DataFrame, y: pd.Series,
     output_path: str (default ".")
         Path to folder in which plots are saved
     """
-    # todo: switch between write_image and show
-    sigma_y = np.std(y)
-    Xy = np.concatenate(
-        (np.asarray(X.transpose()), np.asarray(y).reshape((1, -1))))
-    covariance_matrix = MultivariateGaussian().fit(Xy.transpose()).cov_
+    std_y = np.std(y)
+
+    covariance_matrix = MultivariateGaussian().fit(
+        np.array(pd.concat([X, y], axis=1))).cov_
 
     for feature_index, feature_name in zip(range(X.shape[0]), X):
-        sigma_x = np.std(X[feature_name])
-        p_correlation = covariance_matrix[feature_index, -1] / (
-                sigma_x * sigma_y)
+        std_x = np.std(X[feature_name])
+        p_correlation = covariance_matrix[feature_index, -1] / (std_x * std_y)
 
         go.Figure(
             [go.Scatter(x=X[feature_name], y=y, mode="markers")],
             layout=go.Layout(
-                title=f"feature:{feature_name}, correlation:{p_correlation}",
-                xaxis={"title": f"{feature_name}"},
-                yaxis={"title": "price"},
-                height=400)
-        ).show()
-        # ).write_image(f"{output_path}/{feature_name}.png")
+                title=FEATURE_RESPONSE_PEARSON_COR_PLOT_TITLE_FORMAT.format(
+                    feature_name, p_correlation),
+                xaxis={TITLE_ATTR: feature_name},
+                yaxis={TITLE_ATTR: COL_PRICE},
+                height=PLOT_HEIGHT)
+        ).write_image(f"{output_path}/{feature_name}.png")
+
+
+def fit_model_over_data(train_set: Tuple[pd.DataFrame, pd.Series],
+                        test_set: Tuple[pd.DataFrame, pd.Series],
+                        start_p: int, end_p: int = 100,
+                        repetitions: int = 10) -> None:
+    """
+    For every percentage p in <start_p>%, <start_p+1>%, ..., <end_p>%, repeat
+    the following <repetitions> times:
+      1) Sample p% of the overall training data
+      2) Fit linear model (including intercept) over sampled set
+      3) Test fitted model over test set
+      4) Store average and variance of loss over test set
+    Then plot average loss as function of training size with error ribbon of
+    size (mean-2*std, mean+2*std)
+    """
+    test_features_arr = np.asarray(test_set[FEATURES])
+    test_response_arr = np.asarray(test_set[RESPONSE])
+
+    p_values = tuple(range(start_p, end_p + 1))
+    loss_values = list()
+    var_loss = list()
+
+    for p in p_values:
+        train_concat = pd.concat(
+            [train_set[FEATURES], train_set[RESPONSE]], axis=1)
+        p_loss_values = list()
+
+        for i in range(repetitions):
+            train_sample = train_concat.sample(frac=(p / 100))
+
+            model = LinearRegression()
+            model.fit(train_sample.drop([COL_PRICE], axis=1),
+                      train_sample[COL_PRICE])
+
+            p_loss_values.append(
+                model.loss(test_features_arr, test_response_arr))
+
+        loss_values.append(np.mean(p_loss_values, axis=0))
+        var_loss.append(np.std(p_loss_values, axis=0))
+
+    go.Figure([
+        go.Scatter(x=p_values, y=loss_values, name=Q4_LINE_TITLE,
+                   showlegend=True, mode=MODE_MARKERS_AND_LINES),
+        go.Scatter(x=p_values,
+                   y=np.array(loss_values) + 2 * np.array(var_loss),
+                   fill=FILL_TONEXTY, mode=MODE_LINES,
+                   line=dict(color=CLR_LIGHT_GREY),
+                   showlegend=False, name=Q4_UPPER_ERROR_TITLE),
+        go.Scatter(x=p_values,
+                   y=np.array(loss_values) - 2 * np.array(var_loss),
+                   fill=None, mode=MODE_LINES, line=dict(color=CLR_LIGHT_GREY),
+                   showlegend=False, name=Q4_LOWER_ERROR_TITLE)
+    ],
+        layout=go.Layout(
+            title=Q4_PLOT_TITLE,
+            xaxis={TITLE_ATTR: Q4_PLOT_XAXIS_TITLE},
+            yaxis={TITLE_ATTR: Q4_PLOT_YAXIS_TITLE},
+            height=PLOT_HEIGHT)
+    ).show()
 
 
 if __name__ == '__main__':
     np.random.seed(0)
+
     # Question 1 - Load and preprocessing of housing prices dataset
-    data, response = load_data("../datasets/house_prices.csv")
+    data = load_data(HOUSE_PRICES_CSV_PATH)
 
     # Question 2 - Feature evaluation with respect to response
-    # feature_evaluation(X, y)
+    feature_evaluation(data.drop([COL_PRICE], axis=1), data[COL_PRICE])
 
     # Question 3 - Split samples into training- and testing sets.
-    train_x, train_y, test_x, test_y = split_train_test(data, response, 0.75)
+    (train_features, train_prices,
+     test_features, test_prices) = split_train_test(
+        data.drop([COL_PRICE], axis=1), data[COL_PRICE], 0.75)
 
     # Question 4 - Fit model over increasing percentages of the overall
     # training data.
-    # For every percentage p in 10%, 11%, ..., 100%, repeat the following 10
-    # times:
-    #   1) Sample p% of the overall training data
-    #   2) Fit linear model (including intercept) over sampled set
-    #   3) Test fitted model over test set
-    #   4) Store average and variance of loss over test set
-    # Then plot average loss as function of training size with error ribbon of
-    # size (mean-2*std, mean+2*std)
-    test_x_array, test_y_array = np.asarray(test_x), np.asarray(test_y)
-    p_values = np.arange(10, 101)
-    loss_values = np.ndarray((91,))
-    var_loss = np.ndarray((91,))
-    for p in p_values:
-        train = pd.concat([train_x, train_y], axis=1)
-        loss_array = np.ndarray((10,))
-        for i in range(10):
-            p_train_xy = train.sample(frac=p / 100)
-            model = LinearRegression()
-            model.fit(p_train_xy.drop(["price"], axis=1), p_train_xy["price"])
-            loss_array[i] = model.loss(test_x_array, test_y_array)
-        loss_values[p - 10] = np.mean(loss_array, axis=0)
-        var_loss[p - 10] = np.std(loss_array, axis=0)
-
-    fig = go.Figure([
-        go.Scatter(x=p_values, y=loss_values, name="Real Model",
-                   showlegend=True, mode="markers+lines"),
-        go.Scatter(x=p_values, y=loss_values + 2 * var_loss, fill='tonexty',
-                   mode="lines", line=dict(color="lightgrey"),
-                   showlegend=False),
-        go.Scatter(x=p_values, y=loss_values - 2 * var_loss, fill=None,
-                   mode="lines", line=dict(color="lightgrey"),
-                   showlegend=False)
-    ],
-        layout=go.Layout(
-            title="loss as a function of percentage of train data",
-            xaxis={"title": "percentage"},
-            yaxis={"title": "average loss"},
-            height=400)
-    )
-
-    fig.show()
+    fit_model_over_data((train_features, train_prices),
+                        (test_features, test_prices), 10)
