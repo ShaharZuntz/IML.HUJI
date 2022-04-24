@@ -1,3 +1,6 @@
+import numpy as np
+import pandas as pd
+
 from IMLearn.learners.classifiers import Perceptron, LDA, GaussianNaiveBayes
 from typing import Tuple
 from utils import *
@@ -8,8 +11,9 @@ from math import atan2, pi
 
 def load_dataset(filename: str) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Load dataset for comparing the Gaussian Naive Bayes and LDA classifiers. File is assumed to be an
-    ndarray of shape (n_samples, 3) where the first 2 columns represent features and the third column the class
+    Load dataset for comparing the Gaussian Naive Bayes and LDA classifiers.
+    File is assumed to be a ndarray of shape (n_samples, 3) where the first 2
+    columns represent features and the third column the class
 
     Parameters
     ----------
@@ -31,21 +35,32 @@ def load_dataset(filename: str) -> Tuple[np.ndarray, np.ndarray]:
 
 def run_perceptron():
     """
-    Fit and plot fit progression of the Perceptron algorithm over both the linearly separable and inseparable datasets
+    Fit and plot fit progression of the Perceptron algorithm over both the
+    linearly separable and inseparable datasets
 
-    Create a line plot that shows the perceptron algorithm's training loss values (y-axis)
-    as a function of the training iterations (x-axis).
+    Create a line plot that shows the perceptron algorithm's training loss
+    values (y-axis) as a function of the training iterations (x-axis).
     """
-    for n, f in [("Linearly Separable", "linearly_separable.npy"), ("Linearly Inseparable", "linearly_inseparable.npy")]:
+    for n, f in [("Linearly Separable", "../datasets/linearly_separable.npy"),
+                 ("Linearly Inseparable", "../datasets/linearly_inseparable.npy")]:
         # Load dataset
-        raise NotImplementedError()
+        X, y = load_dataset(f)
 
         # Fit Perceptron and record loss in each fit iteration
         losses = []
-        raise NotImplementedError()
+
+        def func(fit: Perceptron, _x: np.ndarray, _y: int):
+            losses.append(fit.loss(X, y))
+
+        p = Perceptron(callback=func)
+        p.fit(X, y)
 
         # Plot figure of loss as function of fitting iteration
-        raise NotImplementedError()
+        px.line(pd.DataFrame(list(zip(range(1, len(losses)), losses)),
+                             columns=['number of iteration', 'loss value']),
+                x="number of iteration",
+                y="loss value",
+                title=n).show()
 
 
 def get_ellipse(mu: np.ndarray, cov: np.ndarray):
