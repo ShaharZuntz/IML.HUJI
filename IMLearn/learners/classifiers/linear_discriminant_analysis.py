@@ -53,8 +53,10 @@ class LDA(BaseEstimator):
         self.classes_, counts = np.unique(y, return_counts=True)
         self.pi_ = counts / y.shape[0]
 
-        self.mu_ = np.zeros((self.classes_.shape[0], X.shape[1]))
-        self.cov_ = np.zeros((X.shape[1], X.shape[1]))
+        num_features = X.shape[1] if len(X.shape) > 1 else 1
+
+        self.mu_ = np.zeros((self.classes_.shape[0], num_features))
+        self.cov_ = np.zeros((num_features, num_features))
 
         for i, sample in enumerate(X):
             self.mu_[y[i]] += sample

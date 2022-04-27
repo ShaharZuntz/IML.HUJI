@@ -48,8 +48,9 @@ class GaussianNaiveBayes(BaseEstimator):
         self.classes_, counts = np.unique(y, return_counts=True)
         self.pi_ = counts / y.shape[0]
 
-        self.mu_ = np.zeros((self.classes_.shape[0], X.shape[1]))
-        self.vars_ = np.zeros((self.classes_.shape[0], X.shape[1]))
+        num_features = X.shape[1] if len(X.shape) > 1 else 1
+        self.mu_ = np.zeros((self.classes_.shape[0], num_features))
+        self.vars_ = np.zeros((self.classes_.shape[0], num_features))
 
         for i, sample in enumerate(X):
             self.mu_[y[i]] += sample
@@ -60,7 +61,7 @@ class GaussianNaiveBayes(BaseEstimator):
             diff = sample - self.mu_[y[i]]
             self.vars_[y[i]] += diff ** 2
 
-        self.vars_ /= counts[:, None]
+        self.vars_ /= counts[:, None] - 1
 
     def _predict(self, X: np.ndarray) -> np.ndarray:
         """
@@ -79,15 +80,26 @@ class GaussianNaiveBayes(BaseEstimator):
 
         z = np.ndarray((X.shape[0], self.classes_.shape[0]))
 
+        num_features = X.shape[1] if len(X.shape) > 1 else 1
+
         for i, sample in enumerate(X):
             for k in self.classes_:
-                p_vec = np.array(
-                    [np.log(scipy.stats.norm.pdf(
-                        sample[j], mean=self.mu_[k, j], var=self.vars_[k, j]
-                    )
-                            for j in range(X.shape[1]))]
-                )
-                z[i, k] = np.log(self.pi_[k]) + np.sum(p_vec)
+                l = []
+                for j in range(num_features):
+                    if self.vars_[k, j]:
+                        l.append(
+                            np.log(
+                                scipy.stats.norm.pdf(
+                                    sample[j],
+                                    loc=self.mu_[k, j],
+                                    scale=(self.vars_[k, j]) ** 0.5
+                                )
+                            )
+                        )
+                    else:
+                        l.append(np.log(1 if sample[j] == self.mu_[k, j] else 0))
+
+                z[i, k] = np.log(self.pi_[k]) + np.sum(l)
 
         return np.argmax(z, axis=1)
 
@@ -113,7 +125,7 @@ class GaussianNaiveBayes(BaseEstimator):
         likelihoods = np.ndarray((X.shape[0], self.classes_.shape[0]))
         for k in range(self.classes_.shape[0]):
             n = scipy.stats.multivariate_normal(mean=self.mu_[k],
-                                                cov=self.cov_)
+                                                cov=np.diag(self.vars_[k]))
             for i in range(X.shape[0]):
                 likelihoods[i, k] = n.pdf(X[i]) * self.pi_[k]
 
@@ -138,4 +150,3 @@ class GaussianNaiveBayes(BaseEstimator):
         """
         from ...metrics import misclassification_error
         return misclassification_error(y, self._predict(X))
-

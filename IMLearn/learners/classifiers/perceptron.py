@@ -77,16 +77,13 @@ class Perceptron(BaseEstimator):
         `self.fit_intercept_`
         """
         n_samples = X.shape[0]
-        n_features = X.shape[1]
+        n_features = X.shape[1] if len(X.shape) > 1 else 1
 
         self.coefs_ = np.zeros(n_features + 1 if self.include_intercept_
                                else n_features)
         fixed_X = (np.c_[X, np.ones(n_samples)]
                    if self.include_intercept_ else X)
 
-        # todo: improve efficiency - multipy y * X outside, and yX @
-        #  self.coefs_ once each iteration. then find the index of a
-        #  non-positive value
         for t in range(self.max_iter_):
             for sample, response in zip(fixed_X, y):
                 if response * (sample @ self.coefs_) <= 0:
