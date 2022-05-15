@@ -1,8 +1,8 @@
 from __future__ import annotations
+
 from typing import Tuple, NoReturn
 from ...base import BaseEstimator
 import numpy as np
-from itertools import product
 
 from ...metrics import misclassification_error
 
@@ -44,15 +44,14 @@ class DecisionStump(BaseEstimator):
         y : ndarray of shape (n_samples, )
             Responses of input data to fit to
         """
-        n_samples = X.shape[0]
-        n_features = X.shape[1] if len(X.shape) > 1 else 1
+        if len(X.shape) > 1:
+            cols = (col for col in X.transpose())
+        else:
+            cols = [X]
 
-        thr = X[0, 0]
-        thr_err = 1
-        opt_j = 0
-        sign = 1
+        min_loss, opt_thr, opt_col, opt_sign = np.inf, np.inf, 0, 0
 
-        for j, col in enumerate(X.transpose()):
+        for j, col in enumerate(cols):
             thr_p, thr_err_p = self._find_threshold(col, y, 1)
             thr_m, thr_err_m = self._find_threshold(col, y, -1)
 
@@ -61,10 +60,11 @@ class DecisionStump(BaseEstimator):
             else:
                 thr_j, thr_err_j, sign_j = thr_m, thr_err_m, -1
 
-            if thr_err_j <= thr_err:
-                thr, opt_j, sign = thr_j, j, sign_j
+            if thr_err_j < min_loss:
+                min_loss = thr_err_j
+                opt_thr, opt_col, opt_sign = thr_j, j, sign_j
 
-        self.threshold_, self.j_, self.sign_ = thr, opt_j, sign
+        self.threshold_, self.j_, self.sign_ = opt_thr, opt_col, opt_sign
 
     def _predict(self, X: np.ndarray) -> np.ndarray:
         """
@@ -124,26 +124,23 @@ class DecisionStump(BaseEstimator):
         predicted as `-sign` whereas values which equal to or above the
         threshold are predicted as `sign`
         """
-        matrix = np.c_[values, labels]
 
-        thr = values[0]
-        thr_err = 1
+        sort_idx = np.argsort(values)
+        sorted_values, sorted_labels = values[sort_idx], labels[sort_idx]
+        sorted_values[0] = -np.inf
+        sorted_values = np.append(sorted_values, [np.inf])
+        sorted_labels = np.append(sorted_labels, [0])
 
-        for t in values:
-            values_p = matrix[matrix[:, 0] >= t]
-            values_m = matrix[matrix[:, 0] < t]
+        gte_thr_pred_grade = np.cumsum(sorted_labels[::-1])[::-1] * sign
+        lt_thr_pred_grade = np.cumsum(sorted_labels) * -sign
+        pred_grade = gte_thr_pred_grade + lt_thr_pred_grade
+        thr_idx = np.argmax(pred_grade)
+        thr = sorted_values[thr_idx]
 
-            loss_p = misclassification_error(
-                values_p[:, 1], np.full(values_p.shape[0], sign)
-            ) if values_p.shape[0] > 0 else 1
-            loss_m = misclassification_error(
-                values_m[:, 1], np.full(values_m.shape[0], -sign)
-            ) if values_m.shape[0] > 0 else 1
-
-            loss = loss_p + loss_m
-
-            if loss < thr_err:
-                thr, thr_err = t, thr_err
+        above = sorted_labels[thr_idx:]
+        bellow = sorted_labels[:thr_idx]
+        thr_err = ((-sign) * np.sum(above[np.sign(above) != sign]) +
+                   sign * np.sum(bellow[np.sign(bellow) != -sign]))
 
         return thr, thr_err
 

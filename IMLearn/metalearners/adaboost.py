@@ -1,8 +1,6 @@
 import numpy as np
 from ..base import BaseEstimator
-from typing import Callable, NoReturn
-
-from ..metrics import loss_functions
+from typing import Callable, NoReturn, List, Optional
 
 
 class AdaBoost(BaseEstimator):
@@ -50,33 +48,21 @@ class AdaBoost(BaseEstimator):
         y : ndarray of shape (n_samples, )
             Responses of input data to fit to
         """
-        self.models_ = list()
-        self.D_ = list()
-        self.weights_ = list()
-
         num_samples = X.shape[0]
+        self.D_ = np.ones(num_samples) / num_samples
 
-        S = np.c_[X, y]
-
-        # set initial distribution to i=uniform
-        D_t = np.full(1 / num_samples)
+        self.models_: List[Optional[BaseEstimator]] = [None] * self.iterations_
+        self.weights_ = np.zeros(self.iterations_)
 
         for t in range(self.iterations_):
-            self.D_.append(D_t)
-
-            # invoke base learner on sample drawn according to D_t
-            S_t = np.random.choice(S, num_samples, p=D_t)
-            h_t = self.wl_().fit(S_t[:, :-1], S_t[:, -1])
-            y_t = h_t.predict(S_t[:, :-1])
+            self.models_[t] = self.wl_().fit(X, y * self.D_)
+            y_t = self.models_[t].predict(X)
 
             # update and normalize sample weights
-            e_t = np.sum(y_t != S_t[:, -1])
-            w_t = 0.5 * np.log(1 / e_t - 1)
-            D_t = D_t * np.exp(-y * w_t * y_t)
-            D_t /= np.sum(D_t)
-
-            self.models_.append(h_t)
-            self.weights_.append(w_t)
+            e_t = np.sum(self.D_ * (y_t != y))
+            self.weights_[t] = 0.5 * np.log(1.0 / e_t - 1)
+            self.D_ *= np.exp((-1) * self.weights_[t] * y * y_t)
+            self.D_ /= np.sum(self.D_)
 
     def _predict(self, X):
         """
@@ -130,10 +116,9 @@ class AdaBoost(BaseEstimator):
         responses : ndarray of shape (n_samples, )
             Predicted responses of given samples
         """
-        y_pred = np.full(X.shape[0], 0)
+        y_pred = np.zeros(X.shape[0])
         for i in range(T):
-            y_pred += np.multiply(self.models_[i].predict(X).T,
-                                  self.weights_[i])
+            y_pred += (self.models_[i].predict(X) * self.weights_[i])
 
         return np.sign(y_pred)
 
@@ -157,6 +142,4 @@ class AdaBoost(BaseEstimator):
         loss : float
             Performance under mis-classification loss function
         """
-        return loss_functions.misclassification_error(
-            y, self.partial_predict(X, T)
-        )
+        return np.sum(y != self.partial_predict(X, T)) / y.shape[0]
