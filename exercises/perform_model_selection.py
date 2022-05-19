@@ -5,7 +5,8 @@ from sklearn import datasets
 from IMLearn.metrics import mean_square_error
 from IMLearn.utils import split_train_test
 from IMLearn.model_selection import cross_validate
-from IMLearn.learners.regressors import PolynomialFitting, LinearRegression, RidgeRegression
+from IMLearn.learners.regressors import PolynomialFitting, LinearRegression, \
+    RidgeRegression
 from sklearn.linear_model import Lasso
 
 from utils import *
@@ -27,7 +28,22 @@ def select_polynomial_degree(n_samples: int = 100, noise: float = 5):
     """
     # Question 1 - Generate dataset for model f(x)=(x+3)(x+2)(x+1)(x-1)(x-2) + eps for eps Gaussian noise
     # and split into training- and testing portions
-    raise NotImplementedError()
+    X = np.random.uniform(-1.2, 2, n_samples)
+    f_x = (X + 3)*(X + 2)*(X + 1)*(X - 1)*(X - 2)
+    y = f_x + np.random.normal(np.zeros(n_samples), noise)
+
+    X_train, y_train, X_test, y_test = split_train_test(
+        pd.DataFrame(X), y, 2/3)
+
+    go.Figure(
+        [
+            go.Scatter(x=X_train, y=y_train, mode="markers", fillcolor="red")
+        ],
+        [
+            go.Scatter(x=X_test, y=y_test, mode="markers", fillcolor="blue")
+        ]
+    ).show()
+
 
     # Question 2 - Perform CV for polynomial fitting with degrees 0,1,...,10
     raise NotImplementedError()
@@ -36,7 +52,8 @@ def select_polynomial_degree(n_samples: int = 100, noise: float = 5):
     raise NotImplementedError()
 
 
-def select_regularization_parameter(n_samples: int = 50, n_evaluations: int = 500):
+def select_regularization_parameter(n_samples: int = 50,
+                                    n_evaluations: int = 500):
     """
     Using sklearn's diabetes dataset use cross-validation to select the best fitting regularization parameter
     values for Ridge and Lasso regressions
@@ -61,4 +78,4 @@ def select_regularization_parameter(n_samples: int = 50, n_evaluations: int = 50
 
 if __name__ == '__main__':
     np.random.seed(0)
-    raise NotImplementedError()
+    select_polynomial_degree()
