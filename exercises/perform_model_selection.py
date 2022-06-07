@@ -15,7 +15,8 @@ import plotly.graph_objects as go
 
 def select_polynomial_degree(n_samples: int = 100, noise: float = 5):
     """
-    Simulate data from a polynomial model and use cross-validation to select the best fitting degree
+    Simulate data from a polynomial model and use cross-validation to select
+    the best fitting degree
 
     Parameters
     ----------
@@ -25,17 +26,15 @@ def select_polynomial_degree(n_samples: int = 100, noise: float = 5):
     noise: float, default = 5
         Noise level to simulate in responses
     """
-    # Question 1 - Generate dataset for model f(x)=(x+3)(x+2)(x+1)(x-1)(x-2) + eps for eps Gaussian noise
-    # and split into training- and testing portions
-    X = np.random.uniform(-1.2, 2, n_samples)
-    f_x = (X + 3)*(X + 2)*(X + 1)*(X - 1)*(X - 2)
-    y = f_x + np.random.normal(np.zeros(n_samples), noise)
+    # Question 1 - Generate dataset for model f(x)=(x+3)(x+2)(x+1)(x-1)(x-2)
+    # + eps for eps Gaussian noise and split into training- and testing
+    # portions
+    X, y, y_true = generate_data(n_samples, noise, -1.2, 2)
 
     X_train, y_train, X_test, y_test = split_train_test(
-        pd.DataFrame(X), y, 2/3)
+        pd.DataFrame(X), pd.Series(y), 2 / 3)
 
     plot_Q1_figure(X, X_test, X_train, y_test, y_train, y_true)
-
 
     # Question 2 - Perform CV for polynomial fitting with degrees 0,1,...,10
     train_scores, validation_scores = list(), list()
