@@ -35,20 +35,32 @@ def split_train_test(
         Responses of test samples
 
     """
-    y_name = y.name
-    Xy = pd.concat([X, y], axis=1)
+    n_samples = y.shape[0]
+    train_size = ceil(train_proportion * n_samples)
+    train_indices = np.random.choice(n_samples, train_size, replace=False)
 
-    n_samples = Xy.shape[0]
-    n_samples_train = ceil(train_proportion * n_samples)
+    train_x = X.iloc[train_indices]
+    train_y = y.iloc[train_indices]
 
-    train_xy = Xy.sample(n_samples_train)
-    test_xy = Xy.drop(train_xy.index)
+    test_x = X.drop(train_indices)
+    test_y = y.drop(train_indices)
 
-    train_x = pd.DataFrame(train_xy.drop([y_name], axis=1))
-    test_x = pd.DataFrame(test_xy.drop([y_name], axis=1))
 
-    train_y = train_xy[y_name]
-    test_y = test_xy[y_name]
+
+    # y_name = y.name
+    # Xy = pd.concat([X, y], axis=1)
+    #
+    # n_samples = Xy.shape[0]
+    # n_samples_train = ceil(train_proportion * n_samples)
+    #
+    # train_xy = Xy.sample(n_samples_train)
+    # test_xy = Xy.drop(train_xy.index)
+    #
+    # train_x = pd.DataFrame(train_xy.drop([y_name], axis=1))
+    # test_x = pd.DataFrame(test_xy.drop([y_name], axis=1))
+    #
+    # train_y = train_xy[y_name]
+    # test_y = test_xy[y_name]
 
     return train_x, train_y, test_x, test_y
 
