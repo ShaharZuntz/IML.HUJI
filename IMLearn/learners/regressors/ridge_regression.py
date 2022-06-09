@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import NoReturn
 
+from . import LinearRegression
 from ...base import BaseEstimator
 import numpy as np
 
@@ -55,23 +56,19 @@ class RidgeRegression(BaseEstimator):
 
         Notes
         -----
-        Fits model with or without an intercept depending on value of `self.include_intercept_`
+        Fits model with or without an intercept depending on value of
+        `self.include_intercept_`
         """
+        n_features = X.shape[1] if len(X.shape) > 1 else 1
 
-        n_features = 1 if len(X.shape) < 2 else X.shape[1]
-        lam_id = self.lam_ * np.identity(n_features)
+        l = LinearRegression(self.include_intercept_).fit(X, y)
         if self.include_intercept_:
-            X = np.c_[np.ones(X.shape[0]), X]
+            X = np.c_[np.ones(len(X), dtype=X.dtype), X]
             n_features += 1
-            lam_id = self.lam_ * np.identity(n_features)
-            lam_id[0, 0] = 0
-
-        self.coefs_ = np.linalg.inv(X.T @ X + lam_id) @ X.T @ y
-
-        # X_lam = np.r_[X, self.lam_ ** 0.5 * np.eye(n_features)]
-        # y_lam = np.r_[y, np.zeros(n_features)]
-        #
-        # self.coefs_ = np.linalg.pinv(X_lam) @ y_lam
+        x_t_x = X.T @ X
+        X_lam = (np.linalg.inv(x_t_x + self.lam_ * np.identity(n_features))
+                 @ x_t_x)
+        self.coefs_ = X_lam @ l.coefs_
 
     def _predict(self, X: np.ndarray) -> np.ndarray:
         """

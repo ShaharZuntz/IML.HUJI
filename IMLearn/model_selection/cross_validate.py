@@ -39,9 +39,8 @@ def cross_validate(estimator: BaseEstimator, X: np.ndarray, y: np.ndarray,
     validation_score: float
         Average validation score over folds
     """
-    perm = np.random.permutation(len(X))
+    perm = np.arange(len(X))
     subset_size = int(np.ceil(len(X) / cv))
-
     perm_split = np.split(perm, np.arange(subset_size, len(X), subset_size))
 
     train_scores = 0

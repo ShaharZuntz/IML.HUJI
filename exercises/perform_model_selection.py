@@ -6,7 +6,8 @@ from sklearn import datasets
 from IMLearn.metrics import mean_square_error
 from IMLearn.utils import split_train_test
 from IMLearn.model_selection import cross_validate
-from IMLearn.learners.regressors import PolynomialFitting, RidgeRegression
+from IMLearn.learners.regressors import PolynomialFitting, RidgeRegression, \
+    LinearRegression
 from sklearn.linear_model import Lasso
 
 from utils import *
@@ -34,7 +35,7 @@ def select_polynomial_degree(n_samples: int = 100, noise: float = 5):
     X_train, y_train, X_test, y_test = split_train_test(
         pd.DataFrame(X), pd.Series(y), 2 / 3)
 
-    plot_Q1_figure(X, X_test, X_train, y_test, y_train, y_true)
+    plot_Q1_figure(X, X_test, X_train, y_test, y_train, y_true, noise)
 
     # Question 2 - Perform CV for polynomial fitting with degrees 0,1,...,10
     train_scores, validation_scores = list(), list()
@@ -48,14 +49,11 @@ def select_polynomial_degree(n_samples: int = 100, noise: float = 5):
 
     plot_Q2_figure(train_scores, validation_scores)
 
-    # Question 3 - Using best value of k, fit a k-degree polynomial model and report test error
+    # Question 3 - Using best value of k, fit a k-degree polynomial model and
+    # report test error
     k = np.argmin(validation_scores)
     model = PolynomialFitting(k)
     model.fit(np.array(X_train[0]), np.array(y_train))
-    # todo: remove printing after adding the values into the pdf
-    print(f"The polynomial degree for which the lowest validation error was "
-          f"achieved is {k}. The test error is: "
-          f"{np.round(model.loss(np.array(X_test[0]), np.array(y_test)), 2)}")
 
 
 def plot_Q2_figure(train_scores, validation_scores):
@@ -69,7 +67,7 @@ def plot_Q2_figure(train_scores, validation_scores):
     ).show()
 
 
-def plot_Q1_figure(X, X_test, X_train, y_test, y_train, y_true):
+def plot_Q1_figure(X, X_test, X_train, y_test, y_train, y_true, noise):
     go.Figure(
         [
             go.Scatter(x=X, y=y_true, name="noiseless",
@@ -78,14 +76,14 @@ def plot_Q1_figure(X, X_test, X_train, y_test, y_train, y_true):
                        mode="markers", marker=dict(color="red")),
             go.Scatter(x=X_test[0], y=y_test, name="test set",
                        mode="markers", marker=dict(color="blue"))
-        ], layout=go.Layout(title="Generated Data, with (black) and without "
-                                  "(red for train and blue for test) noise.")
+        ], layout=go.Layout(title="Generated Data, without (black) and "
+                                  "with (red for train and blue for test) "
+                                  f"noise level of {noise}.")
     ).show()
 
 
 def generate_data(n_samples, noise, start, end):
     X = np.linspace(start, end, n_samples)
-    # X = np.random.uniform(start, end, n_samples)
     y_true = f(X)
     epsilon = np.random.normal(np.zeros(n_samples), noise)
     y = y_true + epsilon
@@ -99,8 +97,8 @@ def f(X):
 def select_regularization_parameter(n_samples: int = 50,
                                     n_evaluations: int = 500):
     """
-    Using sklearn's diabetes dataset use cross-validation to select the best fitting regularization parameter
-    values for Ridge and Lasso regressions
+    Using sklearn's diabetes dataset use cross-validation to select the best
+    fitting regularization parameter values for Ridge and Lasso regressions
 
     Parameters
     ----------
@@ -108,19 +106,22 @@ def select_regularization_parameter(n_samples: int = 50,
         Number of samples to generate
 
     n_evaluations: int, default = 500
-        Number of regularization parameter values to evaluate for each of the algorithms
+        Number of regularization parameter values to evaluate for each of the
+        algorithms
     """
-    # Question 6 - Load diabetes dataset and split into training and testing portions
+    # Question 6 - Load diabetes dataset and split into training and testing
+    # portions
     X, y = datasets.load_diabetes(return_X_y=True)
     X_train, y_train = X[:n_samples], y[:n_samples]
     X_test, y_test = X[n_samples:], y[n_samples:]
 
-    # Question 7 - Perform CV for different values of the regularization parameter for Ridge and Lasso regressions
+    # Question 7 - Perform CV for different values of the regularization
+    # parameter for Ridge and Lasso regressions
     l_train_scores, l_validation_scores = list(), list()
     r_train_scores, r_validation_scores = list(), list()
 
-    lasso_range = [5 * i / (n_evaluations) for i in range(n_evaluations)]
-    ridge_range = [10 * i / (n_evaluations) for i in range(n_evaluations)]
+    lasso_range = [2 * i / (n_evaluations) for i in range(n_evaluations)]
+    ridge_range = [2 * i / (n_evaluations) for i in range(n_evaluations)]
 
     for l_lam, r_lam in zip(lasso_range, ridge_range):
         lasso_est = Lasso(l_lam)
@@ -140,25 +141,42 @@ def select_regularization_parameter(n_samples: int = 50,
         [go.Scatter(x=lasso_range, y=l_train_scores,
                     name="training error", mode="lines+markers"),
          go.Scatter(x=lasso_range, y=l_validation_scores,
-                    name="validation error", mode="lines+markers")]
+                    name="validation error", mode="lines+markers")],
+        layout=go.Layout(title="Lasso Regression, training- and "
+                               "validation-error as a function of lambda")
     ).show()
 
     go.Figure(
         [go.Scatter(x=ridge_range, y=r_train_scores,
                     name="training error", mode="lines+markers"),
          go.Scatter(x=ridge_range, y=r_validation_scores,
-                    name="validation error", mode="lines+markers")]
+                    name="validation error", mode="lines+markers")],
+        layout=go.Layout(title="Ridge Regression, training- and "
+                               "validation-error as a function of lambda")
     ).show()
 
 
-    # Question 8 - Compare best Ridge model, best Lasso model and Least Squares model
-    raise NotImplementedError()
+    # Question 8 - Compare best Ridge model, best Lasso model and Least
+    # Squares model
+    l_lam = lasso_range[np.argmin(l_validation_scores)]
+    r_lam = ridge_range[np.argmin(r_validation_scores)]
+
+    lasso_model = Lasso(l_lam)
+    lasso_model.fit(X_train, y_train)
+    ridge_model = RidgeRegression(r_lam)
+    ridge_model.fit(X_train, y_train)
+    ls_model = LinearRegression()
+    ls_model.fit(X_train, y_train)
+
+    lasso_test_error = mean_square_error(y_test, lasso_model.predict(X_test))
+    ridge_test_error = ridge_model.loss(X_test, y_test)
+    ls_test_error = ls_model.loss(X_test, y_test)
 
 
 if __name__ == '__main__':
     np.random.seed(0)
-    # select_polynomial_degree()
-    # select_polynomial_degree(noise=0)
-    # select_polynomial_degree(n_samples=1500, noise=10)
+    select_polynomial_degree()
+    select_polynomial_degree(noise=0)
+    select_polynomial_degree(n_samples=1500, noise=10)
     select_regularization_parameter()
 
