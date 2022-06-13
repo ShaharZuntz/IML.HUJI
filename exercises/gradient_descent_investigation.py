@@ -46,26 +46,30 @@ def plot_descent_path(module: Type[BaseModule],
     fig = plot_descent_path(IMLearn.desent_methods.modules.L1, np.ndarray([[1,1],[0,0]]))
     fig.show()
     """
+
     def predict_(w):
         return np.array([module(weights=wi).compute_output() for wi in w])
 
     from utils import decision_surface
-    return go.Figure([decision_surface(predict_, xrange=xrange, yrange=yrange, density=70, showscale=False),
-                      go.Scatter(x=descent_path[:, 0], y=descent_path[:, 1], mode="markers+lines", marker_color="black")],
+    return go.Figure([decision_surface(predict_, xrange=xrange, yrange=yrange,
+                                       density=70, showscale=False),
+                      go.Scatter(x=descent_path[:, 0], y=descent_path[:, 1],
+                                 mode="markers+lines", marker_color="black")],
                      layout=go.Layout(xaxis=dict(range=xrange),
                                       yaxis=dict(range=yrange),
                                       title=f"GD Descent Path {title}"))
 
 
-def get_gd_state_recorder_callback() -> Tuple[Callable[[], None], List[np.ndarray], List[np.ndarray]]:
+def get_gd_state_recorder_callback() -> Tuple[
+    Callable[[], None], List[np.ndarray], List[np.ndarray]]:
     """
     Callback generator for the GradientDescent class, recording the objective's value and parameters at each iteration
 
     Return:
     -------
     callback: Callable[[], None]
-        Callback function to be passed to the GradientDescent class, recoding the objective's value and parameters
-        at each iteration of the algorithm
+        Callback function to be passed to the GradientDescent class, recoding
+        the objective's value and parameters at each iteration of the algorithm
 
     values: List[np.ndarray]
         Recorded objective values
@@ -73,28 +77,119 @@ def get_gd_state_recorder_callback() -> Tuple[Callable[[], None], List[np.ndarra
     weights: List[np.ndarray]
         Recorded parameters
     """
-    raise NotImplementedError()
+    values: List[np.ndarray] = list()
+    weights: List[np.ndarray] = list()
+
+    def callback(model: GradientDescent, weight: np.ndarray,
+                 val: np.ndarray, **kwargs):
+        values.append(val)
+        weights.append(weight)
+
+    return callback, values, weights
 
 
-def compare_fixed_learning_rates(init: np.ndarray = np.array([np.sqrt(2), np.e / 3]),
-                                 etas: Tuple[float] = (1, .1, .01, .001)):
-    raise NotImplementedError()
+def compare_fixed_learning_rates(
+        init: np.ndarray = np.array([np.sqrt(2), np.e / 3]),
+        etas: Tuple[float] = (1, .1, .01, .001)):
+    for eta in etas:
+        # TODO: extract to a different function
+        callback, values, weights = get_gd_state_recorder_callback()
+        gd = GradientDescent(FixedLR(eta), callback=callback)
+        gd.fit(L1(init), None, None)
+        plot_descent_path(
+            module=L1,
+            descent_path=np.array(weights),
+            title=f"Descent Trajectory; Module: L1, eta={eta}"
+        ).show()
+        num_iter = len(values)
+        go.Figure(
+            [go.Scatter(x=np.arange(num_iter),
+                        y=np.array(values).reshape(num_iter),
+                        mode="markers+lines", marker_color="black")],
+            layout=go.Layout(title=f"Convergence Rate, Module: L1, eta={eta}")
+        ).show()
+
+        callback, values, weights = get_gd_state_recorder_callback()
+        gd = GradientDescent(FixedLR(eta), callback=callback)
+        gd.fit(L2(init), None, None)
+        plot_descent_path(
+            module=L2,
+            descent_path=np.array(weights),
+            title=f"Descent Trajectory; Module: L2, eta={eta}"
+        ).show()
+        num_iter = len(values)
+        go.Figure(
+            [go.Scatter(x=np.arange(num_iter),
+                        y=np.array(values).reshape(num_iter),
+                        mode="markers+lines", marker_color="black")],
+            layout=go.Layout(title=f"Convergence Rate, Module: L2, eta={eta}")
+        ).show()
 
 
-def compare_exponential_decay_rates(init: np.ndarray = np.array([np.sqrt(2), np.e / 3]),
-                                    eta: float = .1,
-                                    gammas: Tuple[float] = (.9, .95, .99, 1)):
-    # Optimize the L1 objective using different decay-rate values of the exponentially decaying learning rate
-    raise NotImplementedError()
+def compare_exponential_decay_rates(
+        init: np.ndarray = np.array([np.sqrt(2), np.e / 3]),
+        eta: float = .1,
+        gammas: Tuple[float] = (.9, .95, .99, 1)):
+    # Optimize the L1 objective using different decay-rate values of the
+    # exponentially decaying learning rate
+    for gamma in gammas:
+        # TODO: plot only convergence rate, for all gammas together
+        callback, values, weights = get_gd_state_recorder_callback()
+        gd = GradientDescent(ExponentialLR(eta, gamma), callback=callback)
+        gd.fit(L1(init), None, None)
+        plot_descent_path(
+            module=L1,
+            descent_path=np.array(weights),
+            title=f"Descent Trajectory; Module: L1, eta={eta}"
+        ).show()
+        num_iter = len(values)
+        go.Figure(
+            [go.Scatter(x=np.arange(num_iter),
+                        y=np.array(values).reshape(num_iter),
+                        mode="markers+lines", marker_color="black")],
+            layout=go.Layout(title=f"Convergence Rate, Module: L1, eta={eta}")
+        ).show()
 
     # Plot algorithm's convergence for the different values of gamma
     raise NotImplementedError()
 
     # Plot descent path for gamma=0.95
-    raise NotImplementedError()
+    # TODO: plot only descent trajectory for L1 and L2 with gamma=.95
+    callback, values, weights = get_gd_state_recorder_callback()
+    gd = GradientDescent(ExponentialLR(eta, .95), callback=callback)
+    gd.fit(L1(init), None, None)
+    plot_descent_path(
+        module=L1,
+        descent_path=np.array(weights),
+        title=f"Descent Trajectory; Module: L1, eta={eta}"
+    ).show()
+    num_iter = len(values)
+    go.Figure(
+        [go.Scatter(x=np.arange(num_iter),
+                    y=np.array(values).reshape(num_iter),
+                    mode="markers+lines", marker_color="black")],
+        layout=go.Layout(title=f"Convergence Rate, Module: L1, eta={eta}")
+    ).show()
+
+    callback, values, weights = get_gd_state_recorder_callback()
+    gd = GradientDescent(ExponentialLR(eta, .95), callback=callback)
+    gd.fit(L2(init), None, None)
+    plot_descent_path(
+        module=L2,
+        descent_path=np.array(weights),
+        title=f"Descent Trajectory; Module: L2, eta={eta}"
+    ).show()
+    num_iter = len(values)
+    go.Figure(
+        [go.Scatter(x=np.arange(num_iter),
+                    y=np.array(values).reshape(num_iter),
+                    mode="markers+lines", marker_color="black")],
+        layout=go.Layout(title=f"Convergence Rate, Module: L2, eta={eta}")
+    ).show()
 
 
-def load_data(path: str = "../datasets/SAheart.data", train_portion: float = .8) -> \
+def load_data(path: str = "../datasets/SAheart.data",
+              train_portion: float = .8) -> \
         Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
     """
     Load South-Africa Heart Disease dataset and randomly split into a train- and test portion
@@ -123,7 +218,8 @@ def load_data(path: str = "../datasets/SAheart.data", train_portion: float = .8)
     """
     df = pd.read_csv(path)
     df.famhist = (df.famhist == 'Present').astype(int)
-    return split_train_test(df.drop(['chd', 'row.names'], axis=1), df.chd, train_portion)
+    return split_train_test(df.drop(['chd', 'row.names'], axis=1), df.chd,
+                            train_portion)
 
 
 def fit_logistic_regression():

@@ -32,7 +32,7 @@ class FixedLR(BaseLR):
         -----
         No arguments are expected
         """
-        raise NotImplementedError()
+        return self.base_lr
 
 
 class ExponentialLR(FixedLR):
@@ -41,7 +41,8 @@ class ExponentialLR(FixedLR):
     """
     def __init__(self, base_lr: float, decay_rate: float):
         """
-        Instantiate an exponentially decaying learning-rate object, i.e. eta_t = eta*gamma^t
+        Instantiate an exponentially decaying learning-rate object, i.e.
+        eta_t = eta*gamma^t
 
         Parameters:
         ----------
@@ -68,4 +69,4 @@ class ExponentialLR(FixedLR):
         eta_t: float
             Exponential decay according to eta_t = eta*gamma^t
         """
-        raise NotImplementedError()
+        return super().lr_step() * (self.decay_rate ** t)
