@@ -190,7 +190,7 @@ class GradientDescent:
 
             # engaging callback func
             self.callback_(
-                self, solver=self, weight=np.copy(w_t), val=np.copy(val),
+                model=self, weight=np.copy(w_t), val=np.copy(val),
                 grad=np.copy(grad), t=t, eta=eta, delta=delta
             )
 
