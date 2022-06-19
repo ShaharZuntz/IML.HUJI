@@ -8,7 +8,6 @@ class L2(BaseModule):
 
     Represents the function: f(w)=||w||^2_2
     """
-
     def __init__(self, weights: np.ndarray = None):
         """
         Initialize a module instance
@@ -38,8 +37,7 @@ class L2(BaseModule):
 
     def compute_jacobian(self, **kwargs) -> np.ndarray:
         """
-        Compute L2 derivative with respect to self.weights at point
-        self.weights
+        Compute L2 derivative with respect to self.weights at point self.weights
 
         Parameters
         ----------
@@ -84,8 +82,7 @@ class L1(BaseModule):
 
     def compute_jacobian(self, **kwargs) -> np.ndarray:
         """
-        Compute L1 derivative with respect to self.weights at point
-        self.weights
+        Compute L1 derivative with respect to self.weights at point self.weights
 
         Parameters
         ----------
@@ -104,10 +101,8 @@ class LogisticModule(BaseModule):
     """
     Class representing the logistic regression objective function
 
-    Represents the function:
-        f(w) = - (1/m) sum_i^m[y*<x_i,w> - log(sigmoid(<x_i,w>))]
+    Represents the function: f(w) = - (1/m) sum_i^m[y*<x_i,w> - log(1+exp(<x_i,w>))]
     """
-
     def __init__(self, weights: np.ndarray = None):
         """
         Initialize a logistic regression module instance
@@ -122,8 +117,7 @@ class LogisticModule(BaseModule):
     def compute_output(self, X: np.ndarray, y: np.ndarray, **kwargs
                        ) -> np.ndarray:
         """
-        Compute the output value of the logistic regression objective function
-        at point self.weights
+        Compute the output value of the logistic regression objective function at point self.weights
 
         Parameters
         ----------
@@ -159,8 +153,7 @@ class LogisticModule(BaseModule):
         Returns
         -------
         output: ndarray of shape (n_features,)
-            Derivative of function with respect to self.weights at point
-            self.weights
+            Derivative of function with respect to self.weights at point self.weights
         """
         n_samples = np.size(y)
         Z = X @ self.weights
@@ -175,10 +168,9 @@ class RegularizedModule(BaseModule):
     """
     Class representing a general regularized objective function of the format:
                                     f(w) = F(w) + lambda*R(w)
-    for F(w) being some fidelity function, R(w) some regularization function
-    and lambda the regularization parameter
+    for F(w) being some fidelity function, R(w) some regularization function and lambda
+    the regularization parameter
     """
-
     def __init__(self,
                  fidelity_module: BaseModule,
                  regularization_module: BaseModule,
@@ -203,8 +195,7 @@ class RegularizedModule(BaseModule):
             Initial value of weights
 
         include_intercept: bool default=True
-            Should fidelity term (and not regularization term) include an
-            intercept or not
+            Should fidelity term (and not regularization term) include an intercept or not
         """
         super().__init__()
         self.fidelity_module_ = fidelity_module
@@ -217,8 +208,7 @@ class RegularizedModule(BaseModule):
 
     def compute_output(self, **kwargs) -> np.ndarray:
         """
-        Compute the output value of the regularized objective function at point
-        self.weights
+        Compute the output value of the regularized objective function at point self.weights
 
         Parameters
         ----------
@@ -266,8 +256,8 @@ class RegularizedModule(BaseModule):
         """
         Setter function for module parameters
 
-        In case self.include_intercept_ is set to True, weights[0] is regarded
-        as the intercept and is not passed to the regularization module
+        In case self.include_intercept_ is set to True, weights[0] is regarded as the intercept
+        and is not passed to the regularization module
 
         Parameters
         ----------
