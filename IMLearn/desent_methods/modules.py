@@ -203,7 +203,7 @@ class RegularizedModule(BaseModule):
         self.lam_ = lam
         self.include_intercept_ = include_intercept
 
-        if weights:
+        if weights is not None:
             self.weights(weights)
 
     def compute_output(self, **kwargs) -> np.ndarray:
