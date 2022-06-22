@@ -97,7 +97,8 @@ class BaseModule(ABC):
         Returns
         -------
         shape: Tuple[int]
-            Specifying the dimensions of the functions parameters. If ``self.weights`` is None returns `(0,)`
+            Specifying the dimensions of the functions parameters. If
+            ``self.weights`` is None returns `(0,)`
         """
         return self.weights.shape if self.weights is not None else (0,)
 
