@@ -8,6 +8,7 @@ class L2(BaseModule):
 
     Represents the function: f(w)=||w||^2_2
     """
+
     def __init__(self, weights: np.ndarray = None):
         """
         Initialize a module instance
@@ -106,6 +107,7 @@ class LogisticModule(BaseModule):
     Represents the function:
         f(w) = - (1/m) sum_i^m[y*<x_i,w> - log(1+exp(<x_i,w>))]
     """
+
     def __init__(self, weights: np.ndarray = None):
         """
         Initialize a logistic regression module instance
@@ -120,7 +122,8 @@ class LogisticModule(BaseModule):
     def compute_output(self, X: np.ndarray, y: np.ndarray, **kwargs
                        ) -> np.ndarray:
         """
-        Compute the output value of the logistic regression objective function at point self.weights
+        Compute the output value of the logistic regression objective function
+        at point self.weights
 
         Parameters
         ----------
@@ -135,17 +138,16 @@ class LogisticModule(BaseModule):
         output: ndarray of shape (1,)
             Value of function at point self.weights
         """
-        # TODO: re-implement (new definition in ex. instructions)
-
         n_samples = np.size(y)
 
         Z = X @ self.weights
-        return - (1 / n_samples) * np.sum(y * Z - np.log(self.sigmoid(Z)))
+        return - (1 / n_samples) * np.sum(y * Z - np.log(1 + np.exp(Z)))
 
     def compute_jacobian(self, X: np.ndarray, y: np.ndarray,
                          **kwargs) -> np.ndarray:
         """
-        Compute the gradient of the logistic regression objective function at point self.weights
+        Compute the gradient of the logistic regression objective function at
+        point self.weights
 
         Parameters
         ----------
@@ -158,13 +160,12 @@ class LogisticModule(BaseModule):
         Returns
         -------
         output: ndarray of shape (n_features,)
-            Derivative of function with respect to self.weights at point self.weights
+            Derivative of function with respect to self.weights at point
+            self.weights
         """
-        # TODO: re-implement (new definition in ex. instructions)
-
         n_samples = np.size(y)
         Z = X @ self.weights
-        return - X ** 2 @ y + X @ self.sigmoid(Z) / n_samples
+        return (1 / n_samples) * (y + self.sigmoid(Z)) @ X
 
     @staticmethod
     def sigmoid(Z: np.ndarray):
@@ -178,6 +179,7 @@ class RegularizedModule(BaseModule):
     for F(w) being some fidelity function, R(w) some regularization function
     and lambda the regularization parameter
     """
+
     def __init__(self,
                  fidelity_module: BaseModule,
                  regularization_module: BaseModule,
@@ -248,9 +250,11 @@ class RegularizedModule(BaseModule):
         output: ndarray of shape (n_in,)
             Derivative with respect to self.weights at point self.weights
         """
-        return (self.fidelity_module_.compute_jacobian(**kwargs) +
-                self.lam_ *
-                self.regularization_module_.compute_jacobian(**kwargs))
+        f_jacobian = self.fidelity_module_.compute_jacobian(**kwargs)
+        r_jacobian = self.regularization_module_.compute_jacobian(**kwargs)
+        if self.include_intercept_:
+            r_jacobian = np.r_[0, r_jacobian]
+        return f_jacobian + self.lam_ * r_jacobian
 
     @property
     def weights(self):
@@ -283,4 +287,3 @@ class RegularizedModule(BaseModule):
             self.regularization_module_.weights = self.weights_[1:, ]
         else:
             self.regularization_module_.weights = self.weights_
-

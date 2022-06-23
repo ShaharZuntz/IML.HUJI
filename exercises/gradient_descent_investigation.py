@@ -2,10 +2,15 @@ import numpy as np
 import pandas as pd
 from typing import Tuple, List, Callable, Type
 
-from IMLearn import BaseModule
+import sklearn.metrics
+from sklearn.metrics import roc_curve
+
+import utils
 from IMLearn.desent_methods import GradientDescent, FixedLR, ExponentialLR
-from IMLearn.desent_methods.modules import L1, L2
+from IMLearn.desent_methods.modules import L1, L2, BaseModule, LogisticModule
 from IMLearn.learners.classifiers.logistic_regression import LogisticRegression
+from IMLearn.metrics import misclassification_error
+from IMLearn.model_selection import cross_validate
 from IMLearn.utils import split_train_test
 
 import plotly.graph_objects as go
@@ -165,8 +170,8 @@ def compare_exponential_decay_rates(
 
 
 def load_data(path: str = "../datasets/SAheart.data",
-              train_portion: float = .8) -> \
-        Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
+              train_portion: float = .8
+              ) -> Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
     """
     Load South-Africa Heart Disease dataset and randomly split into a train- and test portion
 
@@ -201,22 +206,83 @@ def load_data(path: str = "../datasets/SAheart.data",
 def fit_logistic_regression():
     # Load and split SA Heard Disease dataset
     X_train, y_train, X_test, y_test = load_data()
+    X = np.array(X_train)
+    train_mean = np.mean(X, axis=0)
+    X -= train_mean
 
-    # Plotting convergence rate of logistic regression over SA heart disease data
-    raise NotImplementedError()
+    y = np.array(y_train)
+
+    GD = GradientDescent(learning_rate=FixedLR(1e-4), max_iter=20000)
+    model = LogisticRegression(solver=GD).fit(X, y)
+
+    # model = LogisticRegression(solver=GD).fit(X, y)
+    y_prob = model.predict_proba(X)
+
+    fpr, tpr, thresholds = roc_curve(y, y_prob)
+    go.Figure(
+        data=[go.Scatter(x=[0, 1], y=[0, 1], mode="lines",
+                         line=dict(color="black", dash='dash'),
+                         name="Random Class Assignment"),
+              go.Scatter(x=fpr, y=tpr, mode='markers+lines', text=thresholds,
+                         name="", showlegend=False, marker_size=5,
+                         hovertemplate="<b>Threshold:</b>%{text:.3f}<br>FPR: %{x:.3f}<br>TPR: %{y:.3f}")],
+        layout=go.Layout(
+            title="ROC curve of Logistic Regression (non-Regularized) over "
+                  "the South Africa Heart Disease Dataset",
+            xaxis=dict(title=r"$\text{False Positive Rate (FPR)}$"),
+            yaxis=dict(title=r"$\text{True Positive Rate (TPR)}$"))).show()
+
+    opt_alpha = thresholds[np.argmax(tpr - fpr)]
+    model.alpha_ = opt_alpha
+    test = np.array(X_test) - train_mean
+    # print(f"alpha={opt_alpha}, test error={model.loss(test, np.array(y_test))}")
+
 
     # Fitting l1- and l2-regularized logistic regression models, using cross-validation to specify values
     # of regularization parameter
-    raise NotImplementedError()
+
+    lambdas = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1]
+    train_scores, validation_scores = list(), list()
+
+    for lam in lambdas:
+        GD = GradientDescent(learning_rate=FixedLR(base_lr=1e-4), max_iter=20000)
+        model = LogisticRegression(solver=GD, penalty="l1", alpha=0.5,
+                                   lam=lam)
+        train_score, validation_score = cross_validate(
+            model, X, np.array(y_train), misclassification_error
+        )
+        train_scores.append(train_score)
+        validation_scores.append(validation_score)
+
+    opt_lam = lambdas[np.argmin(validation_scores)]
+    GD = GradientDescent(learning_rate=FixedLR(base_lr=1e-4), max_iter=20000)
+    model = LogisticRegression(solver=GD, penalty="l1", alpha=0.5,
+                               lam=opt_lam).fit(X, np.array(y_train))
+    # print(f"l1: lam={opt_lam}, test error"
+    #       f"={model.loss(test, np.array(y_test))}")
+
+    train_scores, validation_scores = list(), list()
+
+    for lam in lambdas:
+        GD = GradientDescent(learning_rate=FixedLR(base_lr=1e-4), max_iter=20000)
+        model = LogisticRegression(solver=GD, penalty="l2", alpha=0.5,
+                                   lam=lam)
+        train_score, validation_score = cross_validate(
+            model, X, np.array(y_train), misclassification_error
+        )
+        train_scores.append(train_score)
+        validation_scores.append(validation_score)
+
+    opt_lam = lambdas[np.argmin(validation_scores)]
+    GD = GradientDescent(learning_rate=FixedLR(base_lr=1e-4), max_iter=20000)
+    model = LogisticRegression(solver=GD, penalty="l2", alpha=0.5,
+                               lam=opt_lam).fit(X, np.array(y_train))
+    # print(f"l2: lam={opt_lam}, test error"
+    #       f"={model.loss(test, np.array(y_test))}")
 
 
 if __name__ == '__main__':
     np.random.seed(0)
-    # compare_fixed_learning_rates()
+    compare_fixed_learning_rates()
     compare_exponential_decay_rates()
-
-    # TODO:
-    #  1) fix modules.LogisticModule
-    #  2) implement logistic_regression.LogisticRegression
-    #  3) implement gradient_descent_investigation.fit_logistic_regression()
     fit_logistic_regression()
